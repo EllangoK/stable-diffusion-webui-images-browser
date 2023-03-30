@@ -776,6 +776,35 @@ def get_current_file(tab_base_tag_box, num, page_index, filenames):
     file = filenames[int(num) + int((page_index - 1) * num_of_imgs_per_page)]
     return file
     
+def show_image_info_gallery(evt: gr.SelectData, tab_base_tag_box, num, page_index, filenames, turn_page_switch):
+    num = evt.index
+    logger.debug(f"tab_base_tag_box, num, page_index, len(filenames), num_of_imgs_per_page: {tab_base_tag_box}, {num}, {page_index}, {len(filenames)}, {num_of_imgs_per_page}")
+    if len(filenames) == 0:
+        # This should only happen if webui was stopped and started again and the user clicks on one of the still displayed images.
+        # The state with the filenames will be empty then. In that case we return None to prevent further errors and force a page refresh.
+        turn_page_switch = -turn_page_switch
+        file = None
+        tm =  None
+        info = ""
+    else:
+        file_num = int(num) + int((page_index - 1) * num_of_imgs_per_page)
+        if file_num >= len(filenames):
+            # Last image to the right is deleted, page refresh
+            turn_page_switch = -turn_page_switch
+            file = None
+            tm =  None
+            info = ""
+        else:
+            file = filenames[file_num]
+            tm =   "<div style='color:#999' align='right'>" + time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(os.path.getmtime(file))) + "</div>"
+            try:
+                with Image.open(file) as image:
+                    _, geninfo, info = modules.extras.run_pnginfo(image)
+            except UnidentifiedImageError as e:
+                info = ""
+                logger.warning(f"UnidentifiedImageError: {e}")
+    return file, tm, num, file, turn_page_switch, info
+
 def show_image_info(tab_base_tag_box, num, page_index, filenames, turn_page_switch):
     logger.debug(f"tab_base_tag_box, num, page_index, len(filenames), num_of_imgs_per_page: {tab_base_tag_box}, {num}, {page_index}, {len(filenames)}, {num_of_imgs_per_page}")
     if len(filenames) == 0:
@@ -1198,8 +1227,10 @@ def create_tab(tab: ImageBrowserTab, current_gr_tab: gr.Tab):
     )
 
     # other functions
-    set_index.click(show_image_info, _js="image_browser_get_current_img", inputs=[tab_base_tag_box, image_index, page_index, filenames, turn_page_switch], outputs=[img_file_name, img_file_time, image_index, hidden, turn_page_switch, img_file_info_add])
-    set_index.click(fn=lambda:(gr.update(visible=delete_panel not in override_hidden), gr.update(visible=button_panel not in override_hidden), gr.update(visible=ranking_panel not in override_hidden), gr.update(visible=to_dir_panel not in override_hidden), gr.update(visible=info_add_panel not in override_hidden)), inputs=None, outputs=hide_on_thumbnail_view)
+    #set_index.click(show_image_info, _js="image_browser_get_current_img", inputs=[tab_base_tag_box, image_index, page_index, filenames, turn_page_switch], outputs=[img_file_name, img_file_time, image_index, hidden, turn_page_switch, img_file_info_add])
+    #set_index.click(fn=lambda:(gr.update(visible=delete_panel not in override_hidden), gr.update(visible=button_panel not in override_hidden), gr.update(visible=ranking_panel not in override_hidden), gr.update(visible=to_dir_panel not in override_hidden), gr.update(visible=info_add_panel not in override_hidden)), inputs=None, outputs=hide_on_thumbnail_view)
+    image_gallery.select(show_image_info_gallery, inputs=[tab_base_tag_box, image_index, page_index, filenames, turn_page_switch], outputs=[img_file_name, img_file_time, image_index, hidden, turn_page_switch, img_file_info_add])
+    image_gallery.select(fn=lambda:(gr.update(visible=delete_panel not in override_hidden), gr.update(visible=button_panel not in override_hidden), gr.update(visible=ranking_panel not in override_hidden), gr.update(visible=to_dir_panel not in override_hidden), gr.update(visible=info_add_panel not in override_hidden)), inputs=None, outputs=hide_on_thumbnail_view)
     img_file_name.change(fn=lambda : "", inputs=None, outputs=[collected_warning])
     img_file_name.change(get_ranking, inputs=img_file_name, outputs=ranking)
 
